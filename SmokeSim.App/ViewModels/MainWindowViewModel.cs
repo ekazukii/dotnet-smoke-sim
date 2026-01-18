@@ -42,9 +42,10 @@ public partial class MainWindowViewModel : ViewModelBase
         Buoyancy = _solver.Parameters.Buoyancy;
         Dissipation = _solver.Parameters.Dissipation;
         BoundaryMode = _solver.Parameters.BoundaryMode;
+        SolverIterations = _solver.Parameters.SolverIterations;
 
-        BrushSize = 12f;
-        BrushStrength = 140f;
+        BrushSize = 8f;
+        BrushStrength = 120f;
 
         _timer = new DispatcherTimer
         {
@@ -99,6 +100,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private BoundaryMode _boundaryMode;
+
+    [ObservableProperty]
+    private int _solverIterations;
 
     public string PauseResumeText => IsPaused ? "Resume" : "Pause";
 
@@ -201,12 +205,22 @@ public partial class MainWindowViewModel : ViewModelBase
         _solver.ApplyBoundaryMode(value);
     }
 
+    partial void OnSolverIterationsChanged(int value)
+    {
+        if (value < 1)
+        {
+            value = 1;
+        }
+
+        _solver.Parameters.SolverIterations = value;
+    }
+
     private int _presetIndex;
     private readonly SolverPreset[] _presets =
     [
-        new("Calm", 0.0002f, 0.0001f, 6f, 2f, 0.03f),
-        new("Swirl", 0.0004f, 0.0002f, 12f, 4f, 0.05f),
-        new("Turbulent", 0.0006f, 0.00025f, 18f, 6f, 0.07f),
+        new("Calm", 0.0002f, 0.0001f, 6f, 2f, 0.03f, 12),
+        new("Swirl", 0.0004f, 0.0002f, 12f, 4f, 0.05f, 16),
+        new("Turbulent", 0.0006f, 0.00025f, 18f, 6f, 0.07f, 20),
     ];
 
     private void ApplyPreset(SolverPreset preset)
@@ -216,6 +230,7 @@ public partial class MainWindowViewModel : ViewModelBase
         Vorticity = preset.Vorticity;
         Buoyancy = preset.Buoyancy;
         Dissipation = preset.Dissipation;
+        SolverIterations = preset.Iterations;
     }
 
     private void ApplyInput(Point position, Size surfaceSize, bool leftPressed, bool rightPressed, Vector delta)
@@ -315,7 +330,8 @@ public partial class MainWindowViewModel : ViewModelBase
         float Diffusion,
         float Vorticity,
         float Buoyancy,
-        float Dissipation);
+        float Dissipation,
+        int Iterations);
 
     private void Render()
     {

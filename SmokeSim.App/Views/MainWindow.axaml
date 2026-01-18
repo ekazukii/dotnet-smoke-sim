@@ -90,6 +90,11 @@
                                   HorizontalAlignment="Stretch"/>
                     </StackPanel>
 
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding SolverIterations, StringFormat='Solver Iterations {0}'}" FontWeight="SemiBold"/>
+                        <Slider Minimum="4" Maximum="40" Value="{Binding SolverIterations}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <Button Content="{Binding PauseResumeText}" Command="{Binding TogglePauseCommand}" />
                         <Button Content="Step" Command="{Binding StepCommand}" />

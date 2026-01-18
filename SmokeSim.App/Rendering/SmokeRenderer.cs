@@ -25,7 +25,7 @@ public sealed class SmokeRenderer
         _densityLut = BuildDensityLut(1024, 220f);
         _densityToLut = (_densityLut.Length - 1) / 220f;
         _lutMaxIndex = _densityLut.Length - 1;
-        _solidColor = Pack(14, 16, 18, 255);
+        _solidColor = Pack(48, 132, 170, 255);
         _bitmap = new WriteableBitmap(
             new PixelSize(width, height),
             new Vector(96, 96),
