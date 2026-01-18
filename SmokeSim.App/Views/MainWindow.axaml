@@ -22,8 +22,8 @@
         </LinearGradientBrush>
         <SolidColorBrush x:Key="PanelBackground" Color="#FAF7F0"/>
         <SolidColorBrush x:Key="PanelBorder" Color="#C4BEB4"/>
-        <SolidColorBrush x:Key="CanvasBackground" Color="#1C1E23"/>
-        <SolidColorBrush x:Key="CanvasBorder" Color="#30343B"/>
+        <SolidColorBrush x:Key="CanvasBackground" Color="#000000"/>
+        <SolidColorBrush x:Key="CanvasBorder" Color="#1B1B1B"/>
     </Window.Resources>
 
     <Grid Background="{DynamicResource AppBackground}" ColumnDefinitions="300,*">
