@@ -118,10 +118,15 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    public void HandlePointerMoved(Point position, Size surfaceSize)
+    public void HandlePointerMoved(Point position, Size surfaceSize, bool leftPressed, bool rightPressed)
     {
         var delta = _lastPointer.HasValue ? position - _lastPointer.Value : default;
         _lastPointer = position;
+        if (leftPressed || rightPressed)
+        {
+            _isLeftDown = leftPressed;
+            _isRightDown = rightPressed;
+        }
 
         ApplyInput(position, surfaceSize, _isLeftDown, _isRightDown, delta);
         if (IsPaused)
@@ -161,6 +166,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         _solver.Clear();
         _solver.ResetObstacles();
+        Render();
     }
 
     [RelayCommand]

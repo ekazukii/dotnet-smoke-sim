@@ -63,8 +63,11 @@ public partial class MainWindow : Window
         }
 
         var point = e.GetPosition(control);
-        var props = e.GetCurrentPoint(control).Properties;
-        viewModel.HandlePointerMoved(point, control.Bounds.Size);
+        var current = e.GetCurrentPoint(control);
+        var props = current.Properties;
+        bool leftPressed = props.IsLeftButtonPressed || props.PointerUpdateKind == PointerUpdateKind.LeftButtonPressed;
+        bool rightPressed = props.IsRightButtonPressed || props.PointerUpdateKind == PointerUpdateKind.RightButtonPressed;
+        viewModel.HandlePointerMoved(point, control.Bounds.Size, leftPressed, rightPressed);
     }
 
     private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)

@@ -351,6 +351,18 @@ public sealed class FluidSolver2D
                     yPos = Math.Clamp(yPos, 0.5f, Height + 0.5f);
                 }
 
+                float midX = (xPos + x) * 0.5f;
+                float midY = (y + yPos) * 0.5f;
+                int midXi = (int)MathF.Floor(midX);
+                int midYi = (int)MathF.Floor(midY);
+                midXi = Math.Clamp(midXi, 0, Width + 1);
+                midYi = Math.Clamp(midYi, 0, Height + 1);
+                if (solid[Idx(midXi, midYi)])
+                {
+                    d[idx] = b == 0 ? d0[idx] : 0f;
+                    continue;
+                }
+
                 int i0 = (int)MathF.Floor(x);
                 int i1 = i0 + 1;
                 int j0 = (int)MathF.Floor(yPos);
