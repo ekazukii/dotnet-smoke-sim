@@ -1,0 +1,122 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SmokeSim.App.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="760"
+        x:Class="SmokeSim.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="SmokeSim"
+        Background="#ECE7DD"
+        FontFamily="Georgia, 'Times New Roman', serif">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Window.Resources>
+        <LinearGradientBrush x:Key="AppBackground" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#F3EFE7" Offset="0"/>
+            <GradientStop Color="#DDE3E8" Offset="1"/>
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="PanelBackground" Color="#FAF7F0"/>
+        <SolidColorBrush x:Key="PanelBorder" Color="#C4BEB4"/>
+        <SolidColorBrush x:Key="CanvasBackground" Color="#1C1E23"/>
+        <SolidColorBrush x:Key="CanvasBorder" Color="#30343B"/>
+    </Window.Resources>
+
+    <Grid Background="{DynamicResource AppBackground}" ColumnDefinitions="300,*">
+        <Border Grid.Column="0"
+                Margin="16"
+                Padding="18"
+                Background="{DynamicResource PanelBackground}"
+                BorderBrush="{DynamicResource PanelBorder}"
+                BorderThickness="1"
+                CornerRadius="18">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="14">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="SMOKE SIM" FontSize="20" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding Fps, StringFormat='FPS {0:0}'}" FontSize="12" Foreground="#6F6A63"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Tool Mode" FontWeight="SemiBold"/>
+                        <ComboBox ItemsSource="{Binding ToolModes}"
+                                  SelectedItem="{Binding SelectedTool}"
+                                  HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding BrushSize, StringFormat='Brush Size {0:0}'}" FontWeight="SemiBold"/>
+                        <Slider Minimum="2" Maximum="30" Value="{Binding BrushSize}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding BrushStrength, StringFormat='Brush Strength {0:0}'}" FontWeight="SemiBold"/>
+                        <Slider Minimum="20" Maximum="260" Value="{Binding BrushStrength}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding Viscosity, StringFormat='Viscosity {0:0.0000}'}" FontWeight="SemiBold"/>
+                        <Slider Minimum="0" Maximum="0.002" Value="{Binding Viscosity}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding Diffusion, StringFormat='Diffusion {0:0.0000}'}" FontWeight="SemiBold"/>
+                        <Slider Minimum="0" Maximum="0.002" Value="{Binding Diffusion}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding Vorticity, StringFormat='Vorticity {0:0.0}'}" FontWeight="SemiBold"/>
+                        <Slider Minimum="0" Maximum="24" Value="{Binding Vorticity}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding Buoyancy, StringFormat='Buoyancy {0:0.0}'}" FontWeight="SemiBold"/>
+                        <Slider Minimum="0" Maximum="12" Value="{Binding Buoyancy}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding Dissipation, StringFormat='Dissipation {0:0.00}'}" FontWeight="SemiBold"/>
+                        <Slider Minimum="0" Maximum="0.2" Value="{Binding Dissipation}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Edges" FontWeight="SemiBold"/>
+                        <ComboBox ItemsSource="{Binding BoundaryModes}"
+                                  SelectedItem="{Binding BoundaryMode}"
+                                  HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="{Binding PauseResumeText}" Command="{Binding TogglePauseCommand}" />
+                        <Button Content="Step" Command="{Binding StepCommand}" />
+                        <Button Content="Reset" Command="{Binding ResetCommand}" />
+                    </StackPanel>
+
+                    <Button Content="Presets" Command="{Binding PresetCommand}" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <Border Grid.Column="1"
+                Margin="16"
+                Background="{DynamicResource CanvasBackground}"
+                BorderBrush="{DynamicResource CanvasBorder}"
+                BorderThickness="1"
+                CornerRadius="20"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                PointerPressed="OnPointerPressed"
+                PointerMoved="OnPointerMoved"
+                PointerReleased="OnPointerReleased">
+            <Image Name="RenderImage"
+                   Source="{Binding Bitmap}"
+                   Stretch="Fill"
+                   HorizontalAlignment="Stretch"
+                   VerticalAlignment="Stretch"/>
+        </Border>
+    </Grid>
+</Window>
