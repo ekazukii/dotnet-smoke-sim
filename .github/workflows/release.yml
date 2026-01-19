@@ -24,11 +24,11 @@ jobs:
           - os: macos-latest
             rid: osx-x64
             artifact_name: SmokeSim-macos-x64
-            artifact_file: SmokeSim-macos-x64.tar.gz
+            artifact_file: SmokeSim-macos-x64.zip
           - os: macos-latest
             rid: osx-arm64
             artifact_name: SmokeSim-macos-arm64
-            artifact_file: SmokeSim-macos-arm64.tar.gz
+            artifact_file: SmokeSim-macos-arm64.zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -37,11 +37,47 @@ jobs:
           dotnet-version: 9.0.x
       - name: Publish
         run: dotnet publish SmokeSim.App/SmokeSim.App.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o publish/${{ matrix.rid }}
-      - name: Package (unix)
-        if: runner.os != 'Windows'
+      - name: Package (linux)
+        if: runner.os == 'Linux'
         run: |
           cd publish/${{ matrix.rid }}
           tar -czf ../../${{ matrix.artifact_file }} .
+      - name: Bundle (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          APP_NAME="SmokeSim"
+          EXEC_NAME="SmokeSim.App"
+          BUNDLE_ID="fr.baptisteloison.smokesim"
+          VERSION="1.0.${GITHUB_RUN_NUMBER}"
+          BUNDLE_DIR="bundle/${APP_NAME}.app"
+          mkdir -p "${BUNDLE_DIR}/Contents/MacOS" "${BUNDLE_DIR}/Contents/Resources"
+          cp -R "publish/${{ matrix.rid }}/." "${BUNDLE_DIR}/Contents/MacOS/"
+          cat > "${BUNDLE_DIR}/Contents/Info.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>${EXEC_NAME}</string>
+            <key>CFBundleIdentifier</key>
+            <string>${BUNDLE_ID}</string>
+            <key>CFBundleName</key>
+            <string>${APP_NAME}</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>${VERSION}</string>
+            <key>CFBundleVersion</key>
+            <string>${VERSION}</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.13</string>
+          </dict>
+          </plist>
+          EOF
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent "bundle/SmokeSim.app" "${{ matrix.artifact_file }}"
       - name: Package (windows)
         if: runner.os == 'Windows'
         shell: pwsh
