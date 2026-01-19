@@ -1,0 +1,70 @@
+name: build-and-release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact_name: SmokeSim-linux-x64
+            artifact_file: SmokeSim-linux-x64.tar.gz
+          - os: windows-latest
+            rid: win-x64
+            artifact_name: SmokeSim-win-x64
+            artifact_file: SmokeSim-win-x64.zip
+          - os: macos-latest
+            rid: osx-x64
+            artifact_name: SmokeSim-macos-x64
+            artifact_file: SmokeSim-macos-x64.tar.gz
+          - os: macos-latest
+            rid: osx-arm64
+            artifact_name: SmokeSim-macos-arm64
+            artifact_file: SmokeSim-macos-arm64.tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Publish
+        run: dotnet publish SmokeSim.App/SmokeSim.App.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o publish/${{ matrix.rid }}
+      - name: Package (unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd publish/${{ matrix.rid }}
+          tar -czf ../../${{ matrix.artifact_file }} .
+      - name: Package (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "publish/${{ matrix.rid }}/*" -DestinationPath "${{ matrix.artifact_file }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_file }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Tag
+        id: tag
+        run: echo "tag=build-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Release ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          files: artifacts/**/*
