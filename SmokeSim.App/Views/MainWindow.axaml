@@ -84,8 +84,13 @@
                     </StackPanel>
 
                     <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding SimulationSpeed, StringFormat='Sim Speed {0:0.00}x'}" FontWeight="SemiBold"/>
+                        <Slider Minimum="0.05" Maximum="1.0" Value="{Binding SimulationSpeed}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
                         <TextBlock Text="{Binding SolverIterations, StringFormat='Solver Iterations {0}'}" FontWeight="SemiBold"/>
-                        <Slider Minimum="4" Maximum="40" Value="{Binding SolverIterations}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                        <Slider Minimum="1" Maximum="10" Value="{Binding SolverIterations}" IsSnapToTickEnabled="True" TickFrequency="1"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Spacing="10">

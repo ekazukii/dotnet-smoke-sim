@@ -15,11 +15,13 @@ namespace SmokeSim.App.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
+    private const float FixedDt = 1f / 60f;
     private readonly FluidSolver2D _solver;
     private readonly SmokeRenderer _renderer;
     private readonly DispatcherTimer _timer;
     private readonly Stopwatch _frameTimer = new();
     private readonly Stopwatch _fpsTimer = new();
+    private readonly Stopwatch _diagnosticTimer = new();
     private Point? _lastPointer;
     private bool _isLeftDown;
     private bool _isRightDown;
@@ -41,6 +43,7 @@ public partial class MainWindowViewModel : ViewModelBase
         Dissipation = _solver.Parameters.Dissipation;
         SolverIterations = _solver.Parameters.SolverIterations;
 
+        SimulationSpeed = 0.1f;
         BrushSize = 8f;
         BrushStrength = 120f;
 
@@ -50,10 +53,11 @@ public partial class MainWindowViewModel : ViewModelBase
         };
         _timer.Tick += (_, _) => OnTick();
 
-        IsPaused = true;
+        IsPaused = false;
         Render();
         _frameTimer.Start();
         _fpsTimer.Start();
+        _diagnosticTimer.Start();
         _timer.Start();
 
         Bitmap = _renderer.Bitmap;
@@ -96,6 +100,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private int _solverIterations;
+
+    [ObservableProperty]
+    private float _simulationSpeed;
 
     public string PauseResumeText => IsPaused ? "Resume" : "Pause";
 
@@ -143,6 +150,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             _frameTimer.Restart();
             _fpsTimer.Restart();
+            _diagnosticTimer.Restart();
             _frames = 0;
         }
     }
@@ -150,7 +158,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void Step()
     {
-        _solver.Step(1f / 60f);
+        _solver.Step(FixedDt * SimulationSpeed);
         Render();
     }
 
@@ -212,9 +220,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private int _presetIndex;
     private readonly SolverPreset[] _presets =
     [
-        new("Calm", 0.0002f, 0.0001f, 6f, 2f, 0.03f, 12),
-        new("Swirl", 0.0004f, 0.0002f, 12f, 4f, 0.05f, 16),
-        new("Turbulent", 0.0006f, 0.00025f, 18f, 6f, 0.07f, 20),
+        new("Calm", 0.0002f, 0.0001f, 6f, 2f, 0.03f, 3),
+        new("Swirl", 0.0004f, 0.0002f, 12f, 4f, 0.05f, 4),
+        new("Turbulent", 0.0006f, 0.00025f, 18f, 6f, 0.07f, 5),
     ];
 
     private void ApplyPreset(SolverPreset preset)
@@ -297,18 +305,19 @@ public partial class MainWindowViewModel : ViewModelBase
         float dt = (float)_frameTimer.Elapsed.TotalSeconds;
         _frameTimer.Restart();
 
-        if (dt > 0.05f)
-        {
-            dt = 0.05f;
-        }
-
-        if (!IsPaused)
-        {
-            _solver.Step(dt);
-            Render();
-        }
-
+        _solver.Step(dt * SimulationSpeed);
+        Render();
         _frames++;
+
+        if (_diagnosticTimer.Elapsed.TotalSeconds >= 1.0)
+        {
+            var diag = _solver.ComputeDiagnostics(FixedDt * SimulationSpeed);
+            Console.WriteLine(
+                $"diag maxU {diag.MaxU:0.###} maxV {diag.MaxV:0.###} cfl {diag.Cfl:0.###} " +
+                $"dens[{diag.MinDensity:0.###},{diag.MaxDensity:0.###}] div {diag.MaxDivergence:0.###}");
+            _diagnosticTimer.Restart();
+        }
+
         if (_fpsTimer.Elapsed.TotalSeconds >= 1.0)
         {
             Fps = _frames / _fpsTimer.Elapsed.TotalSeconds;

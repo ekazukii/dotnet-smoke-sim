@@ -4,7 +4,9 @@ namespace SmokeSim.Core;
 
 public sealed class FluidSolver2D
 {
-    private const float MaxVelocity = 50f;
+    private const float MaxVelocity = 10f;
+    private const int MaxCflSubsteps = 4;
+    private const float MaxFrameDt = 1f / 30f;
     private FluidFields _fields;
     private readonly SimulationParameters _parameters;
 
@@ -46,47 +48,95 @@ public sealed class FluidSolver2D
             return;
         }
 
-        AddSources(_fields.VelocityU, _fields.VelocityUPrev, dt);
-        AddSources(_fields.VelocityV, _fields.VelocityVPrev, dt);
-
-        ApplyBuoyancy(_fields.VelocityV, _fields.Density, dt);
-
-        if (_parameters.Viscosity > 0f)
+        if (dt > MaxFrameDt)
         {
-            Swap(ref _fields.VelocityUPrev, ref _fields.VelocityU);
-            Diffuse(1, _fields.VelocityU, _fields.VelocityUPrev, _parameters.Viscosity, dt);
-
-            Swap(ref _fields.VelocityVPrev, ref _fields.VelocityV);
-            Diffuse(2, _fields.VelocityV, _fields.VelocityVPrev, _parameters.Viscosity, dt);
+            dt = MaxFrameDt;
         }
 
-        Project(_fields.VelocityU, _fields.VelocityV, _fields.Pressure, _fields.Divergence);
-        ClampVelocity(_fields.VelocityU, _fields.VelocityV);
+        float maxSpeed = ComputeMaxSpeed();
+        float cfl = maxSpeed * dt * Math.Max(Width, Height);
+        int steps = cfl <= 0f ? 1 : (int)MathF.Ceiling(cfl / 0.9f);
+        steps = Math.Clamp(steps, 1, MaxCflSubsteps);
 
-        Swap(ref _fields.VelocityUPrev, ref _fields.VelocityU);
-        Swap(ref _fields.VelocityVPrev, ref _fields.VelocityV);
-        Advect(1, _fields.VelocityU, _fields.VelocityUPrev, _fields.VelocityUPrev, _fields.VelocityVPrev, dt);
-        Advect(2, _fields.VelocityV, _fields.VelocityVPrev, _fields.VelocityUPrev, _fields.VelocityVPrev, dt);
-
-        Project(_fields.VelocityU, _fields.VelocityV, _fields.Pressure, _fields.Divergence);
-
-        if (_parameters.Vorticity > 0f)
+        float subDt = dt / steps;
+        for (int i = 0; i < steps; i++)
         {
-            ApplyVorticityConfinement(_fields.VelocityU, _fields.VelocityV, dt, _parameters.Vorticity);
+            StepInternal(subDt);
         }
-        ClampVelocity(_fields.VelocityU, _fields.VelocityV);
+    }
 
-        if (_parameters.Diffusion > 0f)
+    public SolverDiagnostics ComputeDiagnostics(float dt)
+    {
+        var u = _fields.VelocityU;
+        var v = _fields.VelocityV;
+        var density = _fields.Density;
+        var solid = _fields.Obstacles.Data;
+
+        float maxU = 0f;
+        float maxV = 0f;
+        float minD = float.PositiveInfinity;
+        float maxD = 0f;
+        float maxDiv = 0f;
+        float invW = 1f / Width;
+        float invH = 1f / Height;
+
+        for (int y = 1; y <= Height; y++)
         {
-            Swap(ref _fields.DensityPrev, ref _fields.Density);
-            Diffuse(0, _fields.Density, _fields.DensityPrev, _parameters.Diffusion, dt);
+            int row = y * Stride;
+            for (int x = 1; x <= Width; x++)
+            {
+                int idx = row + x;
+                if (solid[idx])
+                {
+                    continue;
+                }
+
+                float uAbs = MathF.Abs(u[idx]);
+                float vAbs = MathF.Abs(v[idx]);
+                if (uAbs > maxU)
+                {
+                    maxU = uAbs;
+                }
+                if (vAbs > maxV)
+                {
+                    maxV = vAbs;
+                }
+
+                float d = density[idx];
+                if (float.IsFinite(d))
+                {
+                    if (d < minD)
+                    {
+                        minD = d;
+                    }
+                    if (d > maxD)
+                    {
+                        maxD = d;
+                    }
+                }
+
+                float uR = solid[idx + 1] ? 0f : u[idx + 1];
+                float uL = solid[idx - 1] ? 0f : u[idx - 1];
+                float vU = solid[idx + Stride] ? 0f : v[idx + Stride];
+                float vD = solid[idx - Stride] ? 0f : v[idx - Stride];
+                float div = -0.5f * ((uR - uL) * invW + (vU - vD) * invH);
+                float absDiv = MathF.Abs(div);
+                if (absDiv > maxDiv)
+                {
+                    maxDiv = absDiv;
+                }
+            }
         }
 
-        Swap(ref _fields.DensityPrev, ref _fields.Density);
-        Advect(0, _fields.Density, _fields.DensityPrev, _fields.VelocityU, _fields.VelocityV, dt);
+        if (!float.IsFinite(minD))
+        {
+            minD = 0f;
+        }
 
-        ClearInteriorEdges(_fields.Density);
-        ApplyDissipation(_fields.Density, dt);
+        float maxVel = MathF.Max(maxU, maxV);
+        float cfl = maxVel * dt * Math.Max(Width, Height);
+
+        return new SolverDiagnostics(maxU, maxV, maxVel, cfl, minD, maxD, maxDiv);
     }
 
     public void AddDensityCircle(int centerX, int centerY, float amount, int radius)
@@ -142,6 +192,52 @@ public sealed class FluidSolver2D
 
     public int Idx(int x, int y) => x + Stride * y;
 
+    private void StepInternal(float dt)
+    {
+        AddSources(_fields.VelocityU, _fields.VelocityUPrev, dt);
+        AddSources(_fields.VelocityV, _fields.VelocityVPrev, dt);
+
+        ApplyBuoyancy(_fields.VelocityV, _fields.Density, dt);
+        ClampVelocity(_fields.VelocityU, _fields.VelocityV);
+
+        if (_parameters.Viscosity > 0f)
+        {
+            Swap(ref _fields.VelocityUPrev, ref _fields.VelocityU);
+            Diffuse(1, _fields.VelocityU, _fields.VelocityUPrev, _parameters.Viscosity, dt);
+
+            Swap(ref _fields.VelocityVPrev, ref _fields.VelocityV);
+            Diffuse(2, _fields.VelocityV, _fields.VelocityVPrev, _parameters.Viscosity, dt);
+        }
+
+        Project(_fields.VelocityU, _fields.VelocityV, _fields.Pressure, _fields.Divergence);
+        ClampVelocity(_fields.VelocityU, _fields.VelocityV);
+
+        Swap(ref _fields.VelocityUPrev, ref _fields.VelocityU);
+        Swap(ref _fields.VelocityVPrev, ref _fields.VelocityV);
+        Advect(1, _fields.VelocityU, _fields.VelocityUPrev, _fields.VelocityUPrev, _fields.VelocityVPrev, dt);
+        Advect(2, _fields.VelocityV, _fields.VelocityVPrev, _fields.VelocityUPrev, _fields.VelocityVPrev, dt);
+
+        Project(_fields.VelocityU, _fields.VelocityV, _fields.Pressure, _fields.Divergence);
+
+        if (_parameters.Vorticity > 0f)
+        {
+            ApplyVorticityConfinement(_fields.VelocityU, _fields.VelocityV, dt, _parameters.Vorticity);
+        }
+        ClampVelocity(_fields.VelocityU, _fields.VelocityV);
+
+        if (_parameters.Diffusion > 0f)
+        {
+            Swap(ref _fields.DensityPrev, ref _fields.Density);
+            Diffuse(0, _fields.Density, _fields.DensityPrev, _parameters.Diffusion, dt);
+        }
+
+        Swap(ref _fields.DensityPrev, ref _fields.Density);
+        Advect(0, _fields.Density, _fields.DensityPrev, _fields.VelocityU, _fields.VelocityV, dt);
+
+        ClearInteriorEdges(_fields.Density);
+        ApplyDissipation(_fields.Density, dt);
+    }
+
     private void ApplyCircle(int centerX, int centerY, int radius, Action<int, int, float> apply)
     {
         if (radius < 1)
@@ -171,6 +267,40 @@ public sealed class FluidSolver2D
                 apply(x, y, weight);
             }
         }
+    }
+
+    private float ComputeMaxSpeed()
+    {
+        var u = _fields.VelocityU;
+        var v = _fields.VelocityV;
+        var solid = _fields.Obstacles.Data;
+        float max = 0f;
+
+        for (int y = 1; y <= Height; y++)
+        {
+            int row = y * Stride;
+            for (int x = 1; x <= Width; x++)
+            {
+                int idx = row + x;
+                if (solid[idx])
+                {
+                    continue;
+                }
+
+                float uAbs = MathF.Abs(u[idx]);
+                float vAbs = MathF.Abs(v[idx]);
+                if (uAbs > max)
+                {
+                    max = uAbs;
+                }
+                if (vAbs > max)
+                {
+                    max = vAbs;
+                }
+            }
+        }
+
+        return max;
     }
 
     private void AddSources(float[] x, float[] s, float dt)

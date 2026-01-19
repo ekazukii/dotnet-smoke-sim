@@ -7,5 +7,5 @@ public sealed class SimulationParameters
     public float Vorticity { get; set; } = 15.0f;
     public float Buoyancy { get; set; } = 1.0f;
     public float Dissipation { get; set; } = 0.10f;
-    public int SolverIterations { get; set; } = 16;
+    public int SolverIterations { get; set; } = 4;
 }
