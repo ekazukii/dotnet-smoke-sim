@@ -84,13 +84,6 @@
                     </StackPanel>
 
                     <StackPanel Spacing="6">
-                        <TextBlock Text="Edges" FontWeight="SemiBold"/>
-                        <ComboBox ItemsSource="{Binding BoundaryModes}"
-                                  SelectedItem="{Binding BoundaryMode}"
-                                  HorizontalAlignment="Stretch"/>
-                    </StackPanel>
-
-                    <StackPanel Spacing="6">
                         <TextBlock Text="{Binding SolverIterations, StringFormat='Solver Iterations {0}'}" FontWeight="SemiBold"/>
                         <Slider Minimum="4" Maximum="40" Value="{Binding SolverIterations}" IsSnapToTickEnabled="True" TickFrequency="1"/>
                     </StackPanel>
@@ -116,7 +109,8 @@
                 VerticalAlignment="Stretch"
                 PointerPressed="OnPointerPressed"
                 PointerMoved="OnPointerMoved"
-                PointerReleased="OnPointerReleased">
+                PointerReleased="OnPointerReleased"
+                PointerCaptureLost="OnPointerCaptureLost">
             <Image Name="RenderImage"
                    Source="{Binding Bitmap}"
                    Stretch="Fill"

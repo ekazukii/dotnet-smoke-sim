@@ -4,6 +4,7 @@ namespace SmokeSim.Core;
 
 public sealed class FluidSolver2D
 {
+    private const float MaxVelocity = 50f;
     private FluidFields _fields;
     private readonly SimulationParameters _parameters;
 
@@ -11,7 +12,6 @@ public sealed class FluidSolver2D
     {
         _fields = new FluidFields(width, height);
         _parameters = parameters ?? new SimulationParameters();
-        ApplyBoundaryMode(_parameters.BoundaryMode);
     }
 
     public FluidFields Fields => _fields;
@@ -39,13 +39,6 @@ public sealed class FluidSolver2D
         _fields.Obstacles.ClearInterior();
     }
 
-    public void ApplyBoundaryMode(BoundaryMode mode)
-    {
-        _parameters.BoundaryMode = mode;
-        bool borderSolid = mode == BoundaryMode.Bounce;
-        _fields.Obstacles.SetBorderSolid(borderSolid);
-    }
-
     public void Step(float dt)
     {
         if (dt <= 0f)
@@ -68,6 +61,7 @@ public sealed class FluidSolver2D
         }
 
         Project(_fields.VelocityU, _fields.VelocityV, _fields.Pressure, _fields.Divergence);
+        ClampVelocity(_fields.VelocityU, _fields.VelocityV);
 
         Swap(ref _fields.VelocityUPrev, ref _fields.VelocityU);
         Swap(ref _fields.VelocityVPrev, ref _fields.VelocityV);
@@ -80,6 +74,7 @@ public sealed class FluidSolver2D
         {
             ApplyVorticityConfinement(_fields.VelocityU, _fields.VelocityV, dt, _parameters.Vorticity);
         }
+        ClampVelocity(_fields.VelocityU, _fields.VelocityV);
 
         if (_parameters.Diffusion > 0f)
         {
@@ -90,11 +85,7 @@ public sealed class FluidSolver2D
         Swap(ref _fields.DensityPrev, ref _fields.Density);
         Advect(0, _fields.Density, _fields.DensityPrev, _fields.VelocityU, _fields.VelocityV, dt);
 
-        if (_parameters.BoundaryMode == BoundaryMode.Open)
-        {
-            ClearInteriorEdges(_fields.Density);
-        }
-
+        ClearInteriorEdges(_fields.Density);
         ApplyDissipation(_fields.Density, dt);
     }
 
@@ -313,9 +304,8 @@ public sealed class FluidSolver2D
         float dt0x = dt * Width;
         float dt0y = dt * Height;
         var solid = _fields.Obstacles.Data;
-        bool bounce = _parameters.BoundaryMode == BoundaryMode.Bounce;
-        bool wrap = _parameters.BoundaryMode == BoundaryMode.Wrap;
 
+        bool isVelocity = b != 0;
         for (int y = 1; y <= Height; y++)
         {
             int row = y * Stride;
@@ -331,24 +321,19 @@ public sealed class FluidSolver2D
                 float x = xPos - dt0x * u[idx];
                 float yPos = y - dt0y * v[idx];
 
-                if (!bounce && !wrap)
+                if (x < 0.5f || x > Width + 0.5f || yPos < 0.5f || yPos > Height + 0.5f)
                 {
-                    if (x < 0.5f || x > Width + 0.5f || yPos < 0.5f || yPos > Height + 0.5f)
-                    {
-                        d[idx] = 0f;
-                        continue;
-                    }
+                    d[idx] = 0f;
+                    continue;
                 }
 
-                if (wrap)
+                x = Math.Clamp(x, 0.5f, Width + 0.5f);
+                yPos = Math.Clamp(yPos, 0.5f, Height + 0.5f);
+
+                if (!float.IsFinite(x) || !float.IsFinite(yPos))
                 {
-                    x = WrapCoord(x, Width);
-                    yPos = WrapCoord(yPos, Height);
-                }
-                else
-                {
-                    x = Math.Clamp(x, 0.5f, Width + 0.5f);
-                    yPos = Math.Clamp(yPos, 0.5f, Height + 0.5f);
+                    d[idx] = 0f;
+                    continue;
                 }
 
                 float midX = (xPos + x) * 0.5f;
@@ -359,7 +344,7 @@ public sealed class FluidSolver2D
                 midYi = Math.Clamp(midYi, 0, Height + 1);
                 if (solid[Idx(midXi, midYi)])
                 {
-                    d[idx] = b == 0 ? d0[idx] : 0f;
+                    d[idx] = isVelocity ? 0f : d0[idx];
                     continue;
                 }
 
@@ -367,6 +352,10 @@ public sealed class FluidSolver2D
                 int i1 = i0 + 1;
                 int j0 = (int)MathF.Floor(yPos);
                 int j1 = j0 + 1;
+                i0 = Math.Clamp(i0, 0, Width + 1);
+                i1 = Math.Clamp(i1, 0, Width + 1);
+                j0 = Math.Clamp(j0, 0, Height + 1);
+                j1 = Math.Clamp(j1, 0, Height + 1);
 
                 float s1 = x - i0;
                 float s0 = 1f - s1;
@@ -378,10 +367,20 @@ public sealed class FluidSolver2D
                 int idx01 = Idx(i0, j1);
                 int idx11 = Idx(i1, j1);
 
-                float d00 = solid[idx00] ? 0f : d0[idx00];
-                float d10 = solid[idx10] ? 0f : d0[idx10];
-                float d01 = solid[idx01] ? 0f : d0[idx01];
-                float d11 = solid[idx11] ? 0f : d0[idx11];
+                bool solid00 = solid[idx00];
+                bool solid10 = solid[idx10];
+                bool solid01 = solid[idx01];
+                bool solid11 = solid[idx11];
+                if (solid00 || solid10 || solid01 || solid11)
+                {
+                    d[idx] = isVelocity ? 0f : d0[idx];
+                    continue;
+                }
+
+                float d00 = d0[idx00];
+                float d10 = d0[idx10];
+                float d01 = d0[idx01];
+                float d11 = d0[idx11];
 
                 d[idx] = s0 * (t0 * d00 + t1 * d01) + s1 * (t0 * d10 + t1 * d11);
             }
@@ -395,6 +394,8 @@ public sealed class FluidSolver2D
         float invW = 1f / Width;
         float invH = 1f / Height;
         var solid = _fields.Obstacles.Data;
+
+        ApplyObstacleBoundaries(u, v);
 
         for (int y = 1; y <= Height; y++)
         {
@@ -550,96 +551,75 @@ public sealed class FluidSolver2D
         SetBounds(2, v);
     }
 
+    private void ApplyObstacleBoundaries(float[] u, float[] v)
+    {
+        var solid = _fields.Obstacles.Data;
+
+        for (int y = 1; y <= Height; y++)
+        {
+            int row = y * Stride;
+            for (int x = 1; x <= Width; x++)
+            {
+                int idx = row + x;
+                if (solid[idx])
+                {
+                    u[idx] = 0f;
+                    v[idx] = 0f;
+                    continue;
+                }
+
+                if (solid[idx - 1] || solid[idx + 1])
+                {
+                    u[idx] = 0f;
+                }
+
+                if (solid[idx - Stride] || solid[idx + Stride])
+                {
+                    v[idx] = 0f;
+                }
+            }
+        }
+    }
+
+    // Prevent extreme velocities from destabilizing advection/projection.
+    private void ClampVelocity(float[] u, float[] v)
+    {
+        float max = MaxVelocity;
+        if (max <= 0f)
+        {
+            return;
+        }
+
+        for (int y = 1; y <= Height; y++)
+        {
+            int row = y * Stride;
+            for (int x = 1; x <= Width; x++)
+            {
+                int idx = row + x;
+                u[idx] = Math.Clamp(u[idx], -max, max);
+                v[idx] = Math.Clamp(v[idx], -max, max);
+            }
+        }
+    }
+
     private void SetBounds(int b, float[] x)
     {
-        if (_parameters.BoundaryMode == BoundaryMode.Open)
-        {
-            for (int i = 1; i <= Width; i++)
-            {
-                x[Idx(i, 0)] = 0f;
-                x[Idx(i, Height + 1)] = 0f;
-            }
-
-            for (int j = 1; j <= Height; j++)
-            {
-                x[Idx(0, j)] = 0f;
-                x[Idx(Width + 1, j)] = 0f;
-            }
-
-            x[Idx(0, 0)] = 0f;
-            x[Idx(0, Height + 1)] = 0f;
-            x[Idx(Width + 1, 0)] = 0f;
-            x[Idx(Width + 1, Height + 1)] = 0f;
-
-            var solidOpen = _fields.Obstacles.Data;
-            for (int y = 1; y <= Height; y++)
-            {
-                int row = y * Stride;
-                for (int xPos = 1; xPos <= Width; xPos++)
-                {
-                    int idx = row + xPos;
-                    if (solidOpen[idx])
-                    {
-                        x[idx] = 0f;
-                    }
-                }
-            }
-
-            return;
-        }
-
-        if (_parameters.BoundaryMode == BoundaryMode.Wrap)
-        {
-            for (int i = 1; i <= Width; i++)
-            {
-                x[Idx(i, 0)] = x[Idx(i, Height)];
-                x[Idx(i, Height + 1)] = x[Idx(i, 1)];
-            }
-
-            for (int j = 1; j <= Height; j++)
-            {
-                x[Idx(0, j)] = x[Idx(Width, j)];
-                x[Idx(Width + 1, j)] = x[Idx(1, j)];
-            }
-
-            x[Idx(0, 0)] = x[Idx(Width, Height)];
-            x[Idx(0, Height + 1)] = x[Idx(Width, 1)];
-            x[Idx(Width + 1, 0)] = x[Idx(1, Height)];
-            x[Idx(Width + 1, Height + 1)] = x[Idx(1, 1)];
-
-            var solidWrap = _fields.Obstacles.Data;
-            for (int y = 1; y <= Height; y++)
-            {
-                int row = y * Stride;
-                for (int xPos = 1; xPos <= Width; xPos++)
-                {
-                    int idx = row + xPos;
-                    if (solidWrap[idx])
-                    {
-                        x[idx] = 0f;
-                    }
-                }
-            }
-
-            return;
-        }
-
         for (int i = 1; i <= Width; i++)
         {
-            x[Idx(i, 0)] = b == 2 ? -x[Idx(i, 1)] : x[Idx(i, 1)];
-            x[Idx(i, Height + 1)] = b == 2 ? -x[Idx(i, Height)] : x[Idx(i, Height)];
+            x[Idx(i, 0)] = 0f;
+            x[Idx(i, Height + 1)] = 0f;
         }
 
         for (int j = 1; j <= Height; j++)
         {
-            x[Idx(0, j)] = b == 1 ? -x[Idx(1, j)] : x[Idx(1, j)];
-            x[Idx(Width + 1, j)] = b == 1 ? -x[Idx(Width, j)] : x[Idx(Width, j)];
+            x[Idx(0, j)] = 0f;
+            x[Idx(Width + 1, j)] = 0f;
         }
 
-        x[Idx(0, 0)] = 0.5f * (x[Idx(1, 0)] + x[Idx(0, 1)]);
-        x[Idx(0, Height + 1)] = 0.5f * (x[Idx(1, Height + 1)] + x[Idx(0, Height)]);
-        x[Idx(Width + 1, 0)] = 0.5f * (x[Idx(Width, 0)] + x[Idx(Width + 1, 1)]);
-        x[Idx(Width + 1, Height + 1)] = 0.5f * (x[Idx(Width, Height + 1)] + x[Idx(Width + 1, Height)]);
+        x[Idx(0, 0)] = 0f;
+        x[Idx(0, Height + 1)] = 0f;
+        x[Idx(Width + 1, 0)] = 0f;
+        x[Idx(Width + 1, Height + 1)] = 0f;
 
         var solid = _fields.Obstacles.Data;
         for (int y = 1; y <= Height; y++)
@@ -654,16 +634,6 @@ public sealed class FluidSolver2D
                 }
             }
         }
-    }
-
-    private static float WrapCoord(float value, int size)
-    {
-        float min = 0.5f;
-        float max = size + 0.5f;
-        float span = max - min;
-        float wrapped = value - min;
-        wrapped = wrapped - MathF.Floor(wrapped / span) * span;
-        return wrapped + min;
     }
 
     private void ClearInteriorEdges(float[] field)

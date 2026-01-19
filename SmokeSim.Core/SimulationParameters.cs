@@ -8,5 +8,4 @@ public sealed class SimulationParameters
     public float Buoyancy { get; set; } = 1.0f;
     public float Dissipation { get; set; } = 0.10f;
     public int SolverIterations { get; set; } = 16;
-    public BoundaryMode BoundaryMode { get; set; } = BoundaryMode.Bounce;
 }

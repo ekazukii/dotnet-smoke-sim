@@ -20,7 +20,7 @@ dotnet run --project SmokeSim.App
 - Right-drag applies a fan force based on mouse movement.
 - Use sliders to tweak viscosity, diffusion, vorticity, buoyancy, dissipation, brush size, and strength.
 - Solver Iterations trades accuracy for speed; lower values run faster.
-- Use the Edges selector to choose Bounce, Open (edges act as a sink), or Wrap boundaries.
+- The simulation uses open boundaries; smoke can leave the domain at the edges.
 
 ## Solver overview
 

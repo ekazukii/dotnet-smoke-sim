@@ -34,14 +34,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
         ToolModes = Enum.GetValues<ToolMode>();
         SelectedTool = ToolMode.Smoke;
-        BoundaryModes = Enum.GetValues<BoundaryMode>();
-
         Viscosity = _solver.Parameters.Viscosity;
         Diffusion = _solver.Parameters.Diffusion;
         Vorticity = _solver.Parameters.Vorticity;
         Buoyancy = _solver.Parameters.Buoyancy;
         Dissipation = _solver.Parameters.Dissipation;
-        BoundaryMode = _solver.Parameters.BoundaryMode;
         SolverIterations = _solver.Parameters.SolverIterations;
 
         BrushSize = 8f;
@@ -63,7 +60,6 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     public IReadOnlyList<ToolMode> ToolModes { get; }
-    public IReadOnlyList<BoundaryMode> BoundaryModes { get; }
 
     [ObservableProperty]
     private WriteableBitmap _bitmap = null!;
@@ -97,9 +93,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private double _fps;
-
-    [ObservableProperty]
-    private BoundaryMode _boundaryMode;
 
     [ObservableProperty]
     private int _solverIterations;
@@ -204,11 +197,6 @@ public partial class MainWindowViewModel : ViewModelBase
     partial void OnDissipationChanged(float value)
     {
         _solver.Parameters.Dissipation = value;
-    }
-
-    partial void OnBoundaryModeChanged(BoundaryMode value)
-    {
-        _solver.ApplyBoundaryMode(value);
     }
 
     partial void OnSolverIterationsChanged(int value)

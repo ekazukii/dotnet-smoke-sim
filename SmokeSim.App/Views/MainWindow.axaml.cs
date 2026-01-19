@@ -81,4 +81,14 @@ public partial class MainWindow : Window
         viewModel.HandlePointerReleased();
         e.Handled = true;
     }
+
+    private void OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.HandlePointerReleased();
+    }
 }
