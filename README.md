@@ -2,6 +2,8 @@
 
 Cross-platform .NET 9 desktop app that simulates 2D smoke using a grid-based Stable Fluids solver, rendered in real time with Avalonia.
 
+https://github.com/user-attachments/assets/6ec4d6b7-b641-42be-9dfe-b19e1a398464
+
 ## How to run
 
 ```bash
